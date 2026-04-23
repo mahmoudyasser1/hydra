@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hydra IPTV Streamer</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; background: #0e1117; color: #e6edf3; }
+        .wrap { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        h1 { margin-top: 0; }
+        .grid { display: grid; grid-template-columns: 360px 1fr; gap: 16px; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 14px; }
+        .row { margin-bottom: 10px; }
+        label { display: block; margin-bottom: 6px; font-size: 13px; color: #9da7b2; }
+        select, input, button { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 8px; border: 1px solid #30363d; background: #0d1117; color: #e6edf3; }
+        button { background: #238636; border: 0; cursor: pointer; }
+        button:hover { background: #2ea043; }
+        .secondary { background: #1f6feb; }
+        .secondary:hover { background: #388bfd; }
+        #video { width: 100%; max-height: 70vh; background: #000; border-radius: 8px; }
+        #status { margin: 8px 0 0; color: #8b949e; }
+        .split { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .hint { font-size: 12px; color: #8b949e; }
+        .hidden { display: none; }
+        .tiny { font-size: 11px; color: #9da7b2; }
+        .epg { max-height: 160px; overflow-y: auto; border: 1px solid #30363d; border-radius: 8px; padding: 8px; }
+        .epg-item { padding: 4px 0; border-bottom: 1px solid #222a35; font-size: 12px; }
+        .epg-item:last-child { border-bottom: 0; }
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-card {
+            width: 320px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <h1>Hydra IPTV Streamer</h1>
+        <div class="grid">
+            <div class="card">
+                <div class="row">
+                    <label for="server-url">Server URL</label>
+                    <input id="server-url" type="text" placeholder="http://hydra.st" value="http://hydra.st">
+                </div>
+                <div class="split">
+                    <div class="row">
+                        <label for="username">Username</label>
+                        <input id="username" type="text" placeholder="Enter username">
+                    </div>
+                    <div class="row">
+                        <label for="password">Password</label>
+                        <input id="password" type="password" placeholder="Enter password">
+                    </div>
+                </div>
+                <div class="row">
+                    <label>
+                        <input id="remember-creds" type="checkbox" style="width:auto; margin-right:8px;">
+                        Remember username and password
+                    </label>
+                </div>
+                <div class="row">
+                    <label>
+                        <input id="auto-login" type="checkbox" style="width:auto; margin-right:8px;">
+                        Auto-login on load
+                    </label>
+                </div>
+                <div class="row">
+                    <label for="cred-expiry-days">Credential expiry (days)</label>
+                    <input id="cred-expiry-days" type="number" min="0" step="1" value="0" placeholder="0 = never expire">
+                </div>
+                <div class="row">
+                    <button id="connect-btn" type="button" class="secondary">Connect</button>
+                </div>
+                <div class="row">
+                    <button id="clear-creds-btn" type="button">Clear Saved Credentials</button>
+                </div>
+                <div class="row">
+                    <button id="clear-all-btn" type="button">Clear All Cache/Data</button>
+                </div>
+                <div class="row">
+                    <label for="mode">Mode</label>
+                    <select id="mode">
+                        <option value="live">Live TV</option>
+                        <option value="movie">Movies</option>
+                        <option value="series">Series</option>
+                    </select>
+                </div>
+                <div class="row">
+                    <label for="category-search">Search Categories</label>
+                    <input id="category-search" type="text" placeholder="Filter categories...">
+                </div>
+                <div class="row">
+                    <label for="category">Category</label>
+                    <select id="category"></select>
+                </div>
+                <div class="row">
+                    <label for="item-search">Search Items</label>
+                    <input id="item-search" type="text" placeholder="Filter channels/movies/series...">
+                </div>
+                <div class="row">
+                    <label for="item">Item</label>
+                    <select id="item"></select>
+                </div>
+                <div id="series-controls" class="row" style="display:none;">
+                    <div class="row">
+                        <label for="episode-search">Search Episodes</label>
+                        <input id="episode-search" type="text" placeholder="Filter episodes...">
+                    </div>
+                    <div class="split">
+                        <div>
+                            <label for="season">Season</label>
+                            <select id="season"></select>
+                        </div>
+                        <div>
+                            <label for="episode">Episode</label>
+                            <select id="episode"></select>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <button id="play-btn" type="button">Play Selected</button>
+                </div>
+                <div class="row">
+                    <button id="download-btn" type="button">Download Selected</button>
+                </div>
+                <div class="row">
+                    <button id="add-favorite-btn" type="button" class="secondary">Add Selected To Favorites</button>
+                </div>
+                <div class="row">
+                    <label for="favorite-folder">Favorite Folder</label>
+                    <div class="split">
+                        <select id="favorite-folder"></select>
+                        <button id="new-folder-btn" type="button">New Folder</button>
+                    </div>
+                </div>
+                <div class="row">
+                    <label for="favorites-select">Favorites</label>
+                    <select id="favorites-select"></select>
+                </div>
+                <div class="split">
+                    <div class="row">
+                        <button id="play-favorite-btn" type="button">Play Favorite</button>
+                    </div>
+                    <div class="row">
+                        <button id="remove-favorite-btn" type="button">Remove Favorite</button>
+                    </div>
+                </div>
+                <div class="row">
+                    <button id="export-data-btn" type="button" class="secondary">Export Backup (JSON)</button>
+                </div>
+                <div class="row">
+                    <label for="import-data-file">Import Backup (JSON)</label>
+                    <input id="import-data-file" type="file" accept="application/json">
+                </div>
+                <div class="row">
+                    <label for="recent-select">Recently Watched</label>
+                    <select id="recent-select"></select>
+                </div>
+                <div class="split">
+                    <div class="row">
+                        <button id="play-recent-btn" type="button">Play Recent</button>
+                    </div>
+                    <div class="row">
+                        <button id="clear-recent-btn" type="button">Clear History</button>
+                    </div>
+                </div>
+                <div class="hint" id="session-hint">Enter server username/password then click Connect.</div>
+                <p id="status">Ready</p>
+            </div>
+
+            <div class="card">
+                <video id="video" controls playsinline></video>
+                <div class="row">
+                    <label for="quality-select">Quality</label>
+                    <select id="quality-select">
+                        <option value="-1">Auto</option>
+                    </select>
+                </div>
+                <div class="split">
+                    <div>
+                        <label for="audio-select">Audio Track</label>
+                        <select id="audio-select"></select>
+                    </div>
+                    <div>
+                        <label for="subtitle-select">Subtitle Track</label>
+                        <select id="subtitle-select"></select>
+                    </div>
+                </div>
+                <div class="row">
+                    <label>Live EPG (current channel)</label>
+                    <div id="epg-panel" class="epg tiny">No EPG loaded.</div>
+                </div>
+                <p id="stream-url" class="hint"></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script>
+        let session = {
+            baseUrl: "",
+            username: "",
+            password: ""
+        };
+
+        const serverUrlEl = document.getElementById("server-url");
+        const usernameEl = document.getElementById("username");
+        const passwordEl = document.getElementById("password");
+        const rememberCredsEl = document.getElementById("remember-creds");
+        const autoLoginEl = document.getElementById("auto-login");
+        const credExpiryDaysEl = document.getElementById("cred-expiry-days");
+        const connectBtn = document.getElementById("connect-btn");
+        const clearCredsBtn = document.getElementById("clear-creds-btn");
+        const clearAllBtn = document.getElementById("clear-all-btn");
+        const modeEl = document.getElementById("mode");
+        const categoryEl = document.getElementById("category");
+        const categorySearchEl = document.getElementById("category-search");
+        const itemEl = document.getElementById("item");
+        const itemSearchEl = document.getElementById("item-search");
+        const seasonEl = document.getElementById("season");
+        const episodeEl = document.getElementById("episode");
+        const episodeSearchEl = document.getElementById("episode-search");
+        const playBtn = document.getElementById("play-btn");
+        const downloadBtn = document.getElementById("download-btn");
+        const addFavoriteBtn = document.getElementById("add-favorite-btn");
+        const favoriteFolderEl = document.getElementById("favorite-folder");
+        const newFolderBtn = document.getElementById("new-folder-btn");
+        const favoritesSelectEl = document.getElementById("favorites-select");
+        const playFavoriteBtn = document.getElementById("play-favorite-btn");
+        const removeFavoriteBtn = document.getElementById("remove-favorite-btn");
+        const exportDataBtn = document.getElementById("export-data-btn");
+        const importDataFileEl = document.getElementById("import-data-file");
+        const recentSelectEl = document.getElementById("recent-select");
+        const playRecentBtn = document.getElementById("play-recent-btn");
+        const clearRecentBtn = document.getElementById("clear-recent-btn");
+        const statusEl = document.getElementById("status");
+        const streamUrlEl = document.getElementById("stream-url");
+        const video = document.getElementById("video");
+        const qualitySelectEl = document.getElementById("quality-select");
+        const audioSelectEl = document.getElementById("audio-select");
+        const subtitleSelectEl = document.getElementById("subtitle-select");
+        const epgPanelEl = document.getElementById("epg-panel");
+        const seriesControlsEl = document.getElementById("series-controls");
+        const sessionHintEl = document.getElementById("session-hint");
+
+        let hls;
+        let latestLivePayload = null;
+        let currentCategories = [];
+        let filteredCategories = [];
+        let currentItems = [];
+        let filteredItems = [];
+        let currentEpisodesBySeason = {};
+        let filteredEpisodes = [];
+        const CREDS_STORAGE_KEY = "iptv_saved_credentials_v1";
+        const FAVORITES_STORAGE_KEY = "iptv_favorites_v1";
+        const RECENT_STORAGE_KEY = "iptv_recent_v1";
+        const SETTINGS_STORAGE_KEY = "iptv_settings_v1";
+        const RESUME_STORAGE_KEY = "iptv_resume_v1";
+        const MAX_RECENT = 30;
+        let favorites = [];
+        let recent = [];
+        let settings = {
+            autoLogin: false,
+            credExpiryDays: 0,
+            folders: ["Default"],
+            remoteMode: true
+        };
+        let resumeStore = {};
+        let remoteFocusIndex = 0;
+
+        function setStatus(text) {
+            statusEl.textContent = text;
+        }
+
+        function setControlsEnabled(enabled) {
+            [modeEl, categorySearchEl, categoryEl, itemSearchEl, itemEl, seasonEl, episodeSearchEl, episodeEl, playBtn, downloadBtn, addFavoriteBtn, favoritesSelectEl, playFavoriteBtn, removeFavoriteBtn, recentSelectEl, playRecentBtn, clearRecentBtn]
+                .forEach((el) => { el.disabled = !enabled; });
+        }
+
+        function loadSettings() {
+            try {
+                settings = { ...settings, ...(JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY) || "{}")) };
+            } catch (error) {
+                // Keep defaults.
+            }
+            autoLoginEl.checked = Boolean(settings.autoLogin);
+            credExpiryDaysEl.value = Number(settings.credExpiryDays || 0);
+            if (!settings.folders || !settings.folders.length) {
+                settings.folders = ["Default"];
+            }
+            renderFolderOptions();
+        }
+
+        function saveSettings() {
+            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+        }
+
+        function renderFolderOptions() {
+            fillSelect(favoriteFolderEl, settings.folders, (f) => f, (f) => f);
+        }
+
+        function loadResumeStore() {
+            try {
+                resumeStore = JSON.parse(localStorage.getItem(RESUME_STORAGE_KEY) || "{}");
+            } catch (error) {
+                resumeStore = {};
+            }
+        }
+
+        function saveResumeStore() {
+            localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(resumeStore));
+        }
+
+        function loadCollections() {
+            try {
+                favorites = JSON.parse(localStorage.getItem(FAVORITES_STORAGE_KEY) || "[]");
+            } catch (error) {
+                favorites = [];
+            }
+            try {
+                recent = JSON.parse(localStorage.getItem(RECENT_STORAGE_KEY) || "[]");
+            } catch (error) {
+                recent = [];
+            }
+            renderCollections();
+        }
+
+        function saveCollections() {
+            localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favorites));
+            localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(recent));
+        }
+
+        function renderCollections() {
+            fillSelect(
+                favoritesSelectEl,
+                favorites,
+                (f, i) => i,
+                (f) => `[${f.folder || "Default"}] [${f.mode.toUpperCase()}] ${f.title}`
+            );
+            fillSelect(
+                recentSelectEl,
+                recent,
+                (r, i) => i,
+                (r) => `[${r.mode.toUpperCase()}] ${r.title}`
+            );
+        }
+
+        function loadSavedCredentials() {
+            try {
+                const raw = localStorage.getItem(CREDS_STORAGE_KEY);
+                if (!raw) {
+                    return;
+                }
+                const saved = JSON.parse(raw);
+                if (saved.expiresAt && Date.now() > Number(saved.expiresAt)) {
+                    localStorage.removeItem(CREDS_STORAGE_KEY);
+                    setStatus("Saved credentials expired");
+                    return;
+                }
+                serverUrlEl.value = saved.baseUrl || "http://hydra.st";
+                usernameEl.value = saved.username || "";
+                passwordEl.value = saved.password || "";
+                rememberCredsEl.checked = true;
+                setStatus("Saved credentials loaded");
+            } catch (error) {
+                setStatus("Failed to load saved credentials");
+            }
+        }
+
+        function persistCredentialsIfNeeded() {
+            if (!rememberCredsEl.checked) {
+                localStorage.removeItem(CREDS_STORAGE_KEY);
+                return;
+            }
+            const expiryDays = Number(credExpiryDaysEl.value || 0);
+            const expiresAt = expiryDays > 0 ? Date.now() + (expiryDays * 24 * 60 * 60 * 1000) : 0;
+            const payload = {
+                baseUrl: getNormalizedBaseUrl(),
+                username: usernameEl.value.trim(),
+                password: passwordEl.value,
+                expiresAt
+            };
+            localStorage.setItem(CREDS_STORAGE_KEY, JSON.stringify(payload));
+        }
+
+        function clearSavedCredentials() {
+            localStorage.removeItem(CREDS_STORAGE_KEY);
+            usernameEl.value = "";
+            passwordEl.value = "";
+            rememberCredsEl.checked = false;
+            setStatus("Saved credentials cleared");
+        }
+
+        function clearAllCacheData() {
+            localStorage.removeItem(CREDS_STORAGE_KEY);
+            localStorage.removeItem(FAVORITES_STORAGE_KEY);
+            localStorage.removeItem(RECENT_STORAGE_KEY);
+            localStorage.removeItem(SETTINGS_STORAGE_KEY);
+            localStorage.removeItem(RESUME_STORAGE_KEY);
+
+            usernameEl.value = "";
+            passwordEl.value = "";
+            rememberCredsEl.checked = false;
+
+            favorites = [];
+            recent = [];
+            settings = {
+                autoLogin: false,
+                credExpiryDays: 0,
+                folders: ["Default"],
+                remoteMode: true
+            };
+            resumeStore = {};
+            renderCollections();
+            renderFolderOptions();
+
+            session = { baseUrl: "", username: "", password: "" };
+            currentCategories = [];
+            filteredCategories = [];
+            currentItems = [];
+            filteredItems = [];
+            currentEpisodesBySeason = {};
+            filteredEpisodes = [];
+
+            fillSelect(categoryEl, [], () => "", () => "");
+            fillSelect(itemEl, [], () => "", () => "");
+            fillSelect(seasonEl, [], () => "", () => "");
+            fillSelect(episodeEl, [], () => "", () => "");
+
+            categorySearchEl.value = "";
+            itemSearchEl.value = "";
+            episodeSearchEl.value = "";
+            streamUrlEl.textContent = "";
+            video.removeAttribute("src");
+            video.load();
+
+            if (hls) {
+                hls.destroy();
+                hls = null;
+            }
+
+            setControlsEnabled(false);
+            sessionHintEl.textContent = "Enter server username/password then click Connect.";
+            setStatus("All cache/data cleared");
+        }
+
+        function getNormalizedBaseUrl() {
+            return serverUrlEl.value.trim().replace(/\/+$/, "");
+        }
+
+        function getFocusableControls() {
+            return [
+                connectBtn, clearCredsBtn, clearAllBtn, modeEl, categorySearchEl, categoryEl, itemSearchEl,
+                itemEl, seasonEl, episodeSearchEl, episodeEl, playBtn, addFavoriteBtn, favoriteFolderEl,
+                newFolderBtn, favoritesSelectEl, playFavoriteBtn, removeFavoriteBtn, recentSelectEl,
+                playRecentBtn, clearRecentBtn, exportDataBtn
+            ];
+        }
+
+        function focusControlByIndex(index) {
+            const controls = getFocusableControls().filter((el) => el && !el.disabled && el.offsetParent !== null);
+            if (!controls.length) {
+                return;
+            }
+            remoteFocusIndex = ((index % controls.length) + controls.length) % controls.length;
+            controls[remoteFocusIndex].focus();
+        }
+
+        async function fetchJson(url) {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        }
+
+        function fillSelect(selectEl, items, getValue, getLabel) {
+            selectEl.innerHTML = "";
+            items.forEach((entry) => {
+                const option = document.createElement("option");
+                option.value = String(getValue(entry));
+                option.textContent = getLabel(entry);
+                selectEl.appendChild(option);
+            });
+        }
+
+        function containsText(value, query) {
+            return String(value || "").toLowerCase().includes(String(query || "").toLowerCase().trim());
+        }
+
+        function getModeConfig() {
+            if (modeEl.value === "live") {
+                return { categoryAction: "get_live_categories", itemAction: "get_live_streams", itemIdField: "stream_id", itemLabel: "channels" };
+            }
+            if (modeEl.value === "movie") {
+                return { categoryAction: "get_vod_categories", itemAction: "get_vod_streams", itemIdField: "stream_id", itemLabel: "movies" };
+            }
+            return { categoryAction: "get_series_categories", itemAction: "get_series", itemIdField: "series_id", itemLabel: "series" };
+        }
+
+        function applyCategoryFilter() {
+            filteredCategories = currentCategories.filter((c) => containsText(c.category_name || c.category_id, categorySearchEl.value));
+            fillSelect(categoryEl, filteredCategories, (c) => c.category_id, (c) => c.category_name || `Category ${c.category_id}`);
+            if (!filteredCategories.length) {
+                currentItems = [];
+                filteredItems = [];
+                fillSelect(itemEl, [], () => "", () => "");
+                setStatus("No categories match this filter");
+                return;
+            }
+            loadItems().catch((e) => setStatus(`Error: ${e.message}`));
+        }
+
+        function applyItemFilter() {
+            filteredItems = currentItems.filter((item) => containsText(item.name || item.stream_id || item.series_id, itemSearchEl.value));
+            const modeConfig = getModeConfig();
+            fillSelect(itemEl, filteredItems, (item) => item[modeConfig.itemIdField], (item) => item.name || "Untitled");
+            if (!filteredItems.length) {
+                setStatus("No items match this filter");
+                return;
+            }
+            if (modeEl.value === "series") {
+                loadSeriesInfo().catch((e) => setStatus(`Error: ${e.message}`));
+            } else {
+                setStatus(`Loaded ${filteredItems.length} ${modeConfig.itemLabel}`);
+            }
+        }
+
+        async function loadCategories() {
+            const isSeries = modeEl.value === "series";
+            setStatus("Loading categories...");
+            seriesControlsEl.style.display = isSeries ? "block" : "none";
+
+            const modeConfig = getModeConfig();
+            currentCategories = await fetchJson(`${session.baseUrl}/player_api.php?action=${modeConfig.categoryAction}&username=${encodeURIComponent(session.username)}&password=${encodeURIComponent(session.password)}`);
+            categorySearchEl.value = "";
+            applyCategoryFilter();
+        }
+
+        async function loadItems() {
+            if (!categoryEl.value) {
+                currentItems = [];
+                filteredItems = [];
+                fillSelect(itemEl, [], () => "", () => "");
+                setStatus("No category selected");
+                return;
+            }
+
+            const modeConfig = getModeConfig();
+            const categoryId = categoryEl.value;
+            setStatus("Loading items...");
+
+            currentItems = await fetchJson(`${session.baseUrl}/player_api.php?action=${modeConfig.itemAction}&username=${encodeURIComponent(session.username)}&password=${encodeURIComponent(session.password)}&category_id=${encodeURIComponent(categoryId)}`);
+            itemSearchEl.value = "";
+            applyItemFilter();
+        }
+
+        function groupEpisodes(episodesObj) {
+            const grouped = {};
+            Object.values(episodesObj || {}).forEach((list) => {
+                (list || []).forEach((ep) => {
+                    const season = String(ep.season || 1);
+                    if (!grouped[season]) {
+                        grouped[season] = [];
+                    }
+                    grouped[season].push(ep);
+                });
+            });
+            return grouped;
+        }
+
+        async function loadSeriesInfo() {
+            const seriesId = itemEl.value;
+            setStatus("Loading seasons/episodes...");
+            const data = await fetchJson(`${session.baseUrl}/player_api.php?username=${encodeURIComponent(session.username)}&password=${encodeURIComponent(session.password)}&action=get_series_info&series_id=${encodeURIComponent(seriesId)}`);
+            currentEpisodesBySeason = groupEpisodes(data.episodes);
+
+            const seasons = Object.keys(currentEpisodesBySeason).sort((a, b) => Number(a) - Number(b));
+            fillSelect(seasonEl, seasons, (s) => s, (s) => `Season ${s}`);
+            episodeSearchEl.value = "";
+            applyEpisodeFilter();
+            setStatus("Series loaded");
+        }
+
+        function loadEpisodesForSeason() {
+            applyEpisodeFilter();
+        }
+
+        function applyEpisodeFilter() {
+            const season = seasonEl.value;
+            const seasonEpisodes = currentEpisodesBySeason[season] || [];
+            filteredEpisodes = seasonEpisodes.filter((ep) => containsText(ep.title || ep.id, episodeSearchEl.value));
+            fillSelect(episodeEl, filteredEpisodes, (ep) => ep.id, (ep, index) => ep.title || `Episode ${index + 1}`);
+            setStatus(`Loaded ${filteredEpisodes.length} episodes for season ${season}`);
+        }
+
+        function buildMovieUrl(item) {
+            const ext = item.container_extension || "mp4";
+            return `${session.baseUrl}/movie/${encodeURIComponent(session.username)}/${encodeURIComponent(session.password)}/${item.stream_id}.${ext}`;
+        }
+
+        function buildEpisodeUrl(ep) {
+            const ext = ep.container_extension || "mp4";
+            return `${session.baseUrl}/series/${encodeURIComponent(session.username)}/${encodeURIComponent(session.password)}/${ep.id}.${ext}`;
+        }
+
+        function buildLiveUrl(item) {
+            const ext = item.container_extension || "ts";
+            return `${session.baseUrl}/live/${encodeURIComponent(session.username)}/${encodeURIComponent(session.password)}/${item.stream_id}.${ext}`;
+        }
+
+        function buildLiveCandidateUrls(item) {
+            const streamId = item.stream_id;
+            const user = encodeURIComponent(session.username);
+            const pass = encodeURIComponent(session.password);
+            const base = session.baseUrl;
+            const ext = (item.container_extension || "ts").toLowerCase();
+            const candidates = new Set();
+            candidates.add(`${base}/live/${user}/${pass}/${streamId}.m3u8`);
+            candidates.add(`${base}/live/${user}/${pass}/${streamId}.ts`);
+            candidates.add(`${base}/live/${user}/${pass}/${streamId}.${ext}`);
+            candidates.add(`${base}/live/${user}/${pass}/${streamId}`);
+            return Array.from(candidates);
+        }
+
+        function buildSelectionPayload() {
+            if (modeEl.value === "movie") {
+                const selected = filteredItems.find((m) => String(m.stream_id) === itemEl.value);
+                if (!selected) {
+                    return null;
+                }
+                return {
+                    id: `movie:${selected.stream_id}`,
+                    mode: "movie",
+                    title: selected.name || `Movie ${selected.stream_id}`,
+                    url: buildMovieUrl(selected)
+                };
+            }
+
+            if (modeEl.value === "live") {
+                const selected = filteredItems.find((ch) => String(ch.stream_id) === itemEl.value);
+                if (!selected) {
+                    return null;
+                }
+                return {
+                    id: `live:${selected.stream_id}`,
+                    mode: "live",
+                    title: selected.name || `Live ${selected.stream_id}`,
+                    url: buildLiveUrl(selected),
+                    fallbackUrls: buildLiveCandidateUrls(selected),
+                    streamId: selected.stream_id
+                };
+            }
+
+            const season = seasonEl.value;
+            const selectedEp = filteredEpisodes.find((ep) => String(ep.id) === episodeEl.value);
+            if (!selectedEp) {
+                return null;
+            }
+            return {
+                id: `series:${selectedEp.id}`,
+                mode: "series",
+                title: selectedEp.title || `Episode ${selectedEp.id}`,
+                url: buildEpisodeUrl(selectedEp),
+                season
+            };
+        }
+
+        function playPayload(payload) {
+            if (!payload) {
+                setStatus("Nothing selected");
+                return;
+            }
+            latestLivePayload = payload.mode === "live" ? payload : null;
+
+            if (payload.mode === "live" && Array.isArray(payload.fallbackUrls) && payload.fallbackUrls.length) {
+                playUrlWithFallback(payload.fallbackUrls);
+            } else {
+                setStatus(`Playing ${payload.mode}...`);
+                playUrl(payload.url);
+            }
+            addRecent(payload);
+        }
+
+        function downloadPayload(payload) {
+            if (!payload) {
+                setStatus("Nothing selected");
+                return;
+            }
+            if (payload.mode === "live") {
+                setStatus("Live channels cannot be downloaded from this button");
+                return;
+            }
+
+            const link = document.createElement("a");
+            link.href = payload.url;
+            link.target = "_blank";
+            link.rel = "noopener";
+            link.download = "";
+            link.click();
+            setStatus(`Download started/opened: ${payload.title}`);
+        }
+
+        function addFavoriteFromSelection() {
+            const payload = buildSelectionPayload();
+            if (!payload) {
+                setStatus("Select something first");
+                return;
+            }
+
+            const exists = favorites.some((f) => f.id === payload.id);
+            if (exists) {
+                setStatus("Already in favorites");
+                return;
+            }
+            favorites.unshift(payload);
+            favorites[0].folder = favoriteFolderEl.value || "Default";
+            saveCollections();
+            renderCollections();
+            setStatus("Added to favorites");
+        }
+
+        function removeSelectedFavorite() {
+            const index = Number(favoritesSelectEl.value);
+            if (!Number.isInteger(index) || index < 0 || index >= favorites.length) {
+                setStatus("No favorite selected");
+                return;
+            }
+            favorites.splice(index, 1);
+            saveCollections();
+            renderCollections();
+            setStatus("Favorite removed");
+        }
+
+        function addRecent(payload) {
+            recent = recent.filter((r) => r.id !== payload.id);
+            recent.unshift(payload);
+            if (recent.length > MAX_RECENT) {
+                recent = recent.slice(0, MAX_RECENT);
+            }
+            saveCollections();
+            renderCollections();
+        }
+
+        function clearRecent() {
+            recent = [];
+            saveCollections();
+            renderCollections();
+            setStatus("Recent history cleared");
+        }
+
+        function populateHlsSelectors() {
+            if (!hls) {
+                fillSelect(qualitySelectEl, [{ id: -1, label: "Auto" }], (q) => q.id, (q) => q.label);
+                fillSelect(audioSelectEl, [], () => "", () => "");
+                fillSelect(subtitleSelectEl, [], () => "", () => "");
+                return;
+            }
+
+            const levels = hls.levels || [];
+            const qualityItems = [{ id: -1, label: "Auto" }].concat(levels.map((lvl, idx) => ({
+                id: idx,
+                label: `${lvl.height || "?"}p / ${Math.round((lvl.bitrate || 0) / 1000)} kbps`
+            })));
+            fillSelect(qualitySelectEl, qualityItems, (q) => q.id, (q) => q.label);
+            qualitySelectEl.value = String(hls.currentLevel >= 0 ? hls.currentLevel : -1);
+
+            const audioTracks = hls.audioTracks || [];
+            fillSelect(audioSelectEl, audioTracks, (a, idx) => idx, (a, idx) => a.name || a.lang || `Audio ${idx + 1}`);
+            if (audioTracks.length) {
+                audioSelectEl.value = String(hls.audioTrack || 0);
+            }
+
+            const subtitleTracks = hls.subtitleTracks || [];
+            const subtitleItems = [{ id: -1, name: "Off" }].concat(subtitleTracks.map((s, idx) => ({ id: idx, name: s.name || s.lang || `Sub ${idx + 1}` })));
+            fillSelect(subtitleSelectEl, subtitleItems, (s) => s.id, (s) => s.name);
+            subtitleSelectEl.value = String(hls.subtitleTrack >= 0 ? hls.subtitleTrack : -1);
+        }
+
+        function tryResumePlayback(url) {
+            const entry = resumeStore[url];
+            if (!entry || !entry.time || entry.time < 10) {
+                return;
+            }
+            const shouldResume = window.confirm(`Resume from ${Math.floor(entry.time)}s?`);
+            if (!shouldResume) {
+                return;
+            }
+            video.currentTime = Number(entry.time);
+        }
+
+        function startAutoRetryLive() {
+            if (!latestLivePayload || latestLivePayload.mode !== "live") {
+                return;
+            }
+            let attempt = 0;
+            const run = () => {
+                if (attempt >= 3 || !latestLivePayload) {
+                    return;
+                }
+                attempt += 1;
+                const delayMs = Math.min(8000, 1000 * Math.pow(2, attempt));
+                setTimeout(() => {
+                    if (!latestLivePayload) {
+                        return;
+                    }
+                    setStatus(`Live dropped. Auto-retry ${attempt}/3...`);
+                    playUrlWithFallback(latestLivePayload.fallbackUrls || [latestLivePayload.url]);
+                }, delayMs);
+            };
+            run();
+        }
+
+        async function loadLiveEpg(streamId) {
+            if (!streamId) {
+                epgPanelEl.textContent = "No EPG loaded.";
+                return;
+            }
+            try {
+                const url = `${session.baseUrl}/player_api.php?username=${encodeURIComponent(session.username)}&password=${encodeURIComponent(session.password)}&action=get_short_epg&stream_id=${encodeURIComponent(streamId)}&limit=10`;
+                const data = await fetchJson(url);
+                const listings = data?.epg_listings || [];
+                if (!listings.length) {
+                    epgPanelEl.textContent = "No EPG data available for this channel.";
+                    return;
+                }
+                epgPanelEl.innerHTML = listings.map((it) => {
+                    const title = atob(it.title || "") || "(No title)";
+                    const start = it.start || "";
+                    const end = it.end || "";
+                    return `<div class="epg-item"><strong>${title}</strong><br><span class="tiny">${start} - ${end}</span></div>`;
+                }).join("");
+            } catch (error) {
+                epgPanelEl.textContent = `EPG load failed: ${error.message}`;
+            }
+        }
+
+        function exportBackup() {
+            const payload = {
+                version: 1,
+                favorites,
+                recent,
+                settings,
+                creds: localStorage.getItem(CREDS_STORAGE_KEY) ? JSON.parse(localStorage.getItem(CREDS_STORAGE_KEY)) : null
+            };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `iptv-backup-${Date.now()}.json`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+            setStatus("Backup exported");
+        }
+
+        function importBackupFile(file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    const data = JSON.parse(String(reader.result || "{}"));
+                    favorites = Array.isArray(data.favorites) ? data.favorites : [];
+                    recent = Array.isArray(data.recent) ? data.recent : [];
+                    if (data.settings && typeof data.settings === "object") {
+                        settings = { ...settings, ...data.settings };
+                        saveSettings();
+                    }
+                    if (data.creds && typeof data.creds === "object") {
+                        localStorage.setItem(CREDS_STORAGE_KEY, JSON.stringify(data.creds));
+                    }
+                    saveCollections();
+                    loadSettings();
+                    loadSavedCredentials();
+                    renderCollections();
+                    setStatus("Backup imported");
+                } catch (error) {
+                    setStatus(`Backup import failed: ${error.message}`);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function playUrl(url) {
+            if (hls) {
+                hls.destroy();
+                hls = null;
+            }
+
+            streamUrlEl.textContent = url;
+            const lower = url.toLowerCase();
+
+            if (lower.endsWith(".m3u8") && window.Hls && Hls.isSupported()) {
+                hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    populateHlsSelectors();
+                    tryResumePlayback(url);
+                    video.play().catch(() => {});
+                });
+                hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, populateHlsSelectors);
+                hls.on(Hls.Events.LEVEL_UPDATED, populateHlsSelectors);
+                hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, populateHlsSelectors);
+            } else {
+                video.src = url;
+                populateHlsSelectors();
+                video.addEventListener("loadedmetadata", () => tryResumePlayback(url), { once: true });
+                video.play().catch(() => {});
+            }
+        }
+
+        function playUrlWithFallback(urls, index = 0) {
+            if (index >= urls.length) {
+                setStatus("Live playback failed for all URL formats");
+                return;
+            }
+
+            const url = urls[index];
+            streamUrlEl.textContent = url;
+
+            if (hls) {
+                hls.destroy();
+                hls = null;
+            }
+
+            const tryNext = () => playUrlWithFallback(urls, index + 1);
+            const lower = url.toLowerCase();
+            setStatus(`Trying live URL format ${index + 1}/${urls.length}...`);
+
+            if (lower.endsWith(".m3u8") && window.Hls && Hls.isSupported()) {
+                hls = new Hls({ debug: false });
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    setStatus("Playing live channel...");
+                    populateHlsSelectors();
+                    video.play().catch(() => {});
+                });
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    if (data && data.fatal) {
+                        tryNext();
+                    }
+                });
+                return;
+            }
+
+            const timeoutId = setTimeout(() => {
+                video.removeEventListener("loadedmetadata", onLoaded);
+                video.removeEventListener("error", onError);
+                tryNext();
+            }, 5000);
+
+            const onLoaded = () => {
+                clearTimeout(timeoutId);
+                video.removeEventListener("error", onError);
+                setStatus("Playing live channel...");
+                populateHlsSelectors();
+                video.play().catch(() => {});
+            };
+
+            const onError = () => {
+                clearTimeout(timeoutId);
+                video.removeEventListener("loadedmetadata", onLoaded);
+                tryNext();
+            };
+
+            video.addEventListener("loadedmetadata", onLoaded, { once: true });
+            video.addEventListener("error", onError, { once: true });
+            video.src = url;
+        }
+
+        async function connectAndLoad() {
+            settings.autoLogin = autoLoginEl.checked;
+            settings.credExpiryDays = Number(credExpiryDaysEl.value || 0);
+            saveSettings();
+            const baseUrl = getNormalizedBaseUrl();
+            const username = usernameEl.value.trim();
+            const password = passwordEl.value;
+
+            if (!baseUrl || !username || !password) {
+                setStatus("Enter server URL, username, and password");
+                return;
+            }
+
+            session = { baseUrl, username, password };
+            persistCredentialsIfNeeded();
+            sessionHintEl.textContent = `Connected target: ${session.baseUrl} (user: ${session.username})`;
+            setControlsEnabled(true);
+            await loadCategories();
+        }
+
+        function playSelected() {
+            try {
+                const payload = buildSelectionPayload();
+                if (!payload) {
+                    setStatus("Selection not found");
+                    return;
+                }
+                playPayload(payload);
+                if (payload.mode === "live") {
+                    loadLiveEpg(payload.streamId);
+                }
+            } catch (error) {
+                setStatus(`Play failed: ${error.message}`);
+            }
+        }
+
+        function downloadSelected() {
+            try {
+                const payload = buildSelectionPayload();
+                if (!payload) {
+                    setStatus("Selection not found");
+                    return;
+                }
+                downloadPayload(payload);
+            } catch (error) {
+                setStatus(`Download failed: ${error.message}`);
+            }
+        }
+
+        connectBtn.addEventListener("click", () => connectAndLoad().catch((e) => setStatus(`Connect error: ${e.message}`)));
+        clearCredsBtn.addEventListener("click", clearSavedCredentials);
+        clearAllBtn.addEventListener("click", clearAllCacheData);
+        modeEl.addEventListener("change", () => loadCategories().catch((e) => setStatus(`Error: ${e.message}`)));
+        categoryEl.addEventListener("change", () => loadItems().catch((e) => setStatus(`Error: ${e.message}`)));
+        categorySearchEl.addEventListener("input", applyCategoryFilter);
+        itemSearchEl.addEventListener("input", applyItemFilter);
+        itemEl.addEventListener("change", () => {
+            if (modeEl.value === "series") {
+                loadSeriesInfo().catch((e) => setStatus(`Error: ${e.message}`));
+            }
+        });
+        seasonEl.addEventListener("change", loadEpisodesForSeason);
+        episodeSearchEl.addEventListener("input", applyEpisodeFilter);
+        playBtn.addEventListener("click", playSelected);
+        downloadBtn.addEventListener("click", downloadSelected);
+        addFavoriteBtn.addEventListener("click", addFavoriteFromSelection);
+        newFolderBtn.addEventListener("click", () => {
+            const name = window.prompt("Folder name:");
+            if (!name) {
+                return;
+            }
+            const trimmed = name.trim();
+            if (!trimmed || settings.folders.includes(trimmed)) {
+                return;
+            }
+            settings.folders.push(trimmed);
+            saveSettings();
+            renderFolderOptions();
+            favoriteFolderEl.value = trimmed;
+            setStatus(`Folder '${trimmed}' added`);
+        });
+        playFavoriteBtn.addEventListener("click", () => {
+            const index = Number(favoritesSelectEl.value);
+            const payload = favorites[index];
+            if (!payload) {
+                setStatus("No favorite selected");
+                return;
+            }
+            playPayload(payload);
+            if (payload.mode === "live") {
+                loadLiveEpg(payload.streamId);
+            }
+        });
+        removeFavoriteBtn.addEventListener("click", removeSelectedFavorite);
+        playRecentBtn.addEventListener("click", () => {
+            const index = Number(recentSelectEl.value);
+            const payload = recent[index];
+            if (!payload) {
+                setStatus("No recent item selected");
+                return;
+            }
+            playPayload(payload);
+        });
+        clearRecentBtn.addEventListener("click", clearRecent);
+        exportDataBtn.addEventListener("click", exportBackup);
+        importDataFileEl.addEventListener("change", () => {
+            const file = importDataFileEl.files && importDataFileEl.files[0];
+            if (!file) {
+                return;
+            }
+            importBackupFile(file);
+            importDataFileEl.value = "";
+        });
+        qualitySelectEl.addEventListener("change", () => {
+            if (!hls) return;
+            hls.currentLevel = Number(qualitySelectEl.value);
+        });
+        audioSelectEl.addEventListener("change", () => {
+            if (!hls) return;
+            hls.audioTrack = Number(audioSelectEl.value);
+        });
+        subtitleSelectEl.addEventListener("change", () => {
+            if (!hls) return;
+            hls.subtitleTrack = Number(subtitleSelectEl.value);
+        });
+
+        video.addEventListener("timeupdate", () => {
+            const url = streamUrlEl.textContent;
+            if (!url || video.paused || video.ended) {
+                return;
+            }
+            if (modeEl.value === "live") {
+                return;
+            }
+            resumeStore[url] = { time: video.currentTime, updatedAt: Date.now() };
+            saveResumeStore();
+        });
+        video.addEventListener("ended", () => {
+            const url = streamUrlEl.textContent;
+            if (url && resumeStore[url]) {
+                delete resumeStore[url];
+                saveResumeStore();
+            }
+        });
+        video.addEventListener("error", () => {
+            if (modeEl.value === "live") {
+                startAutoRetryLive();
+            }
+        });
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                focusControlByIndex(remoteFocusIndex + 1);
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                focusControlByIndex(remoteFocusIndex - 1);
+            } else if (e.key === "Enter") {
+                const active = document.activeElement;
+                if (active && typeof active.click === "function") {
+                    active.click();
+                }
+            }
+        });
+
+        setControlsEnabled(false);
+        loadSettings();
+        loadSavedCredentials();
+        loadCollections();
+        loadResumeStore();
+        populateHlsSelectors();
+        (async () => {
+            if (!settings.autoLogin || !usernameEl.value || !passwordEl.value) {
+                return;
+            }
+            connectAndLoad().catch((e) => setStatus(`Auto-login error: ${e.message}`));
+        })();
+    </script>
+</body>
+</html>
