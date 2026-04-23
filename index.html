@@ -51,7 +51,7 @@
             <div class="card">
                 <div class="row">
                     <label for="server-url">Server URL</label>
-                    <input id="server-url" type="text" placeholder="http://hydra.st" value="http://hydra.st">
+                    <input id="server-url" type="text" placeholder="https://hydra.st" value="https://hydra.st">
                 </div>
                 <div class="split">
                     <div class="row">
@@ -368,7 +368,7 @@
                     setStatus("Saved credentials expired");
                     return;
                 }
-                serverUrlEl.value = saved.baseUrl || "http://hydra.st";
+                serverUrlEl.value = (saved.baseUrl || "https://hydra.st").replace(/^http:\/\//i, "https://");
                 usernameEl.value = saved.username || "";
                 passwordEl.value = saved.password || "";
                 rememberCredsEl.checked = true;
@@ -456,7 +456,10 @@
         }
 
         function getNormalizedBaseUrl() {
-            return serverUrlEl.value.trim().replace(/\/+$/, "");
+            let url = serverUrlEl.value.trim().replace(/\/+$/, "");
+            // Force HTTPS to avoid mixed-content blocks on HTTPS-hosted pages
+            url = url.replace(/^http:\/\//i, "https://");
+            return url;
         }
 
         function getFocusableControls() {
