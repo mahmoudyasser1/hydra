@@ -480,23 +480,21 @@
             controls[remoteFocusIndex].focus();
         }
 
-       async function fetchJson(url) {
-    // Re-route API calls through the Vercel proxy to avoid CORS/HTTPS issues
+       const PROXY_BASE = "quiet-term-94fa.ma7moudyasser1.workers.dev";
+
+async function fetchJson(url) {
     let fetchUrl = url;
     try {
         const parsed = new URL(url);
         if (parsed.pathname.includes("player_api.php")) {
-            fetchUrl = "/api/proxy?" + parsed.searchParams.toString();
+            fetchUrl = PROXY_BASE + "?" + parsed.searchParams.toString();
         }
     } catch (e) {}
 
     const response = await fetch(fetchUrl);
-    if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
 }
-
         function fillSelect(selectEl, items, getValue, getLabel) {
             selectEl.innerHTML = "";
             items.forEach((entry) => {
