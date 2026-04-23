@@ -480,13 +480,22 @@
             controls[remoteFocusIndex].focus();
         }
 
-        async function fetchJson(url) {
-            const response = await fetch(url);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            return response.json();
+       async function fetchJson(url) {
+    // Re-route API calls through the Vercel proxy to avoid CORS/HTTPS issues
+    let fetchUrl = url;
+    try {
+        const parsed = new URL(url);
+        if (parsed.pathname.includes("player_api.php")) {
+            fetchUrl = "/api/proxy?" + parsed.searchParams.toString();
         }
+    } catch (e) {}
+
+    const response = await fetch(fetchUrl);
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+    }
+    return response.json();
+}
 
         function fillSelect(selectEl, items, getValue, getLabel) {
             selectEl.innerHTML = "";
