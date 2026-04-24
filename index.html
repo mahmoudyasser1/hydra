@@ -284,7 +284,7 @@
         }
 
         function setControlsEnabled(enabled) {
-            [modeEl, categorySearchEl, categoryEl, itemSearchEl, itemEl, seasonEl, episodeSearchEl, episodeEl, playBtn, downloadBtn, addFavoriteBtn, favoritesSelectEl, playFavoriteBtn, removeFavoriteBtn, recentSelectEl, playRecentBtn, clearRecentBtn]
+            [modeEl, categorySearchEl, categoryEl, itemSearchEl, itemEl, seasonEl, episodeSearchEl, episodeEl, playBtn, downloadBtn, addFavoriteBtn, favoritesSelectEl, playFavoriteBtn, removeFavoriteBtn, exportDataBtn]
                 .forEach((el) => { el.disabled = !enabled; });
         }
 
@@ -480,21 +480,22 @@
             controls[remoteFocusIndex].focus();
         }
 
-       const PROXY_BASE = "quiet-term-94fa.ma7moudyasser1.workers.dev";
+        const PROXY_BASE = "https://quiet-term-94fa.ma7moudyasser1.workers.dev";
 
-async function fetchJson(url) {
-    let fetchUrl = url;
-    try {
-        const parsed = new URL(url);
-        if (parsed.pathname.includes("player_api.php")) {
-            fetchUrl = PROXY_BASE + "?" + parsed.searchParams.toString();
+        async function fetchJson(url) {
+            let fetchUrl = url;
+            try {
+                const parsed = new URL(url);
+                if (parsed.pathname.includes("player_api.php")) {
+                    fetchUrl = PROXY_BASE + "?" + parsed.searchParams.toString();
+                }
+            } catch (e) {}
+
+            const response = await fetch(fetchUrl);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
         }
-    } catch (e) {}
 
-    const response = await fetch(fetchUrl);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return response.json();
-}
         function fillSelect(selectEl, items, getValue, getLabel) {
             selectEl.innerHTML = "";
             items.forEach((entry) => {
@@ -838,7 +839,7 @@ async function fetchJson(url) {
                 return;
             }
             try {
-                const url = `${session.baseUrl}/player_api.php?username=${encodeURIComponent(session.username)}&password=${encodeURIComponent(session.password)}&action=get_short_epg&stream_id=${encodeURIComponent(streamId)}&limit=10`;
+                const url = `${session.baseUrl}/player_api.php?username=${encodeURIComponent(session.username)}&password=${encodeURIComponent(session.password)}&action=get_short_epg&stream_id=${encodeURIComponent(streamId)}`;
                 const data = await fetchJson(url);
                 const listings = data?.epg_listings || [];
                 if (!listings.length) {
@@ -1001,169 +1002,124 @@ async function fetchJson(url) {
                 return;
             }
 
-            session = { baseUrl, username, password };
-            persistCredentialsIfNeeded();
-            sessionHintEl.textContent = `Connected target: ${session.baseUrl} (user: ${session.username})`;
-            setControlsEnabled(true);
-            await loadCategories();
-        }
-
-        function playSelected() {
             try {
-                const payload = buildSelectionPayload();
-                if (!payload) {
-                    setStatus("Selection not found");
-                    return;
-                }
-                playPayload(payload);
-                if (payload.mode === "live") {
-                    loadLiveEpg(payload.streamId);
-                }
+                setStatus("Connecting...");
+                session = { baseUrl, username, password };
+                persistCredentialsIfNeeded();
+
+                await loadCategories();
+                setControlsEnabled(true);
+                sessionHintEl.textContent = `Connected to ${baseUrl}`;
             } catch (error) {
-                setStatus(`Play failed: ${error.message}`);
+                setStatus(`Connection failed: ${error.message}`);
+                session = { baseUrl: "", username: "", password: "" };
             }
         }
 
-        function downloadSelected() {
-            try {
-                const payload = buildSelectionPayload();
-                if (!payload) {
-                    setStatus("Selection not found");
-                    return;
-                }
-                downloadPayload(payload);
-            } catch (error) {
-                setStatus(`Download failed: ${error.message}`);
-            }
-        }
-
-        connectBtn.addEventListener("click", () => connectAndLoad().catch((e) => setStatus(`Connect error: ${e.message}`)));
-        clearCredsBtn.addEventListener("click", clearSavedCredentials);
-        clearAllBtn.addEventListener("click", clearAllCacheData);
-        modeEl.addEventListener("change", () => loadCategories().catch((e) => setStatus(`Error: ${e.message}`)));
-        categoryEl.addEventListener("change", () => loadItems().catch((e) => setStatus(`Error: ${e.message}`)));
         categorySearchEl.addEventListener("input", applyCategoryFilter);
         itemSearchEl.addEventListener("input", applyItemFilter);
+        episodeSearchEl.addEventListener("input", applyEpisodeFilter);
+        modeEl.addEventListener("change", () => {
+            categorySearchEl.value = "";
+            itemSearchEl.value = "";
+            episodeSearchEl.value = "";
+            currentCategories = [];
+            filteredCategories = [];
+            currentItems = [];
+            filteredItems = [];
+            currentEpisodesBySeason = {};
+            filteredEpisodes = [];
+            fillSelect(categoryEl, [], () => "", () => "");
+            fillSelect(itemEl, [], () => "", () => "");
+            fillSelect(seasonEl, [], () => "", () => "");
+            fillSelect(episodeEl, [], () => "", () => "");
+            if (session.baseUrl) {
+                loadCategories().catch((e) => setStatus(`Error: ${e.message}`));
+            }
+        });
+        categoryEl.addEventListener("change", () => {
+            if (session.baseUrl) {
+                loadItems().catch((e) => setStatus(`Error: ${e.message}`));
+            }
+        });
         itemEl.addEventListener("change", () => {
-            if (modeEl.value === "series") {
+            if (session.baseUrl && modeEl.value === "series") {
                 loadSeriesInfo().catch((e) => setStatus(`Error: ${e.message}`));
             }
         });
         seasonEl.addEventListener("change", loadEpisodesForSeason);
-        episodeSearchEl.addEventListener("input", applyEpisodeFilter);
-        playBtn.addEventListener("click", playSelected);
-        downloadBtn.addEventListener("click", downloadSelected);
-        addFavoriteBtn.addEventListener("click", addFavoriteFromSelection);
-        newFolderBtn.addEventListener("click", () => {
-            const name = window.prompt("Folder name:");
-            if (!name) {
-                return;
-            }
-            const trimmed = name.trim();
-            if (!trimmed || settings.folders.includes(trimmed)) {
-                return;
-            }
-            settings.folders.push(trimmed);
-            saveSettings();
-            renderFolderOptions();
-            favoriteFolderEl.value = trimmed;
-            setStatus(`Folder '${trimmed}' added`);
-        });
-        playFavoriteBtn.addEventListener("click", () => {
-            const index = Number(favoritesSelectEl.value);
-            const payload = favorites[index];
-            if (!payload) {
-                setStatus("No favorite selected");
-                return;
-            }
-            playPayload(payload);
-            if (payload.mode === "live") {
-                loadLiveEpg(payload.streamId);
-            }
-        });
-        removeFavoriteBtn.addEventListener("click", removeSelectedFavorite);
-        playRecentBtn.addEventListener("click", () => {
-            const index = Number(recentSelectEl.value);
-            const payload = recent[index];
-            if (!payload) {
-                setStatus("No recent item selected");
-                return;
-            }
-            playPayload(payload);
-        });
-        clearRecentBtn.addEventListener("click", clearRecent);
-        exportDataBtn.addEventListener("click", exportBackup);
-        importDataFileEl.addEventListener("change", () => {
-            const file = importDataFileEl.files && importDataFileEl.files[0];
-            if (!file) {
-                return;
-            }
-            importBackupFile(file);
-            importDataFileEl.value = "";
-        });
         qualitySelectEl.addEventListener("change", () => {
-            if (!hls) return;
-            hls.currentLevel = Number(qualitySelectEl.value);
+            if (hls) {
+                const level = Number(qualitySelectEl.value);
+                hls.currentLevel = level;
+            }
         });
         audioSelectEl.addEventListener("change", () => {
-            if (!hls) return;
-            hls.audioTrack = Number(audioSelectEl.value);
+            if (hls) {
+                hls.audioTrack = Number(audioSelectEl.value);
+            }
         });
         subtitleSelectEl.addEventListener("change", () => {
-            if (!hls) return;
-            hls.subtitleTrack = Number(subtitleSelectEl.value);
+            if (hls) {
+                const trackId = Number(subtitleSelectEl.value);
+                hls.subtitleTrack = trackId;
+            }
         });
-
+        video.addEventListener("error", startAutoRetryLive);
         video.addEventListener("timeupdate", () => {
-            const url = streamUrlEl.textContent;
-            if (!url || video.paused || video.ended) {
-                return;
-            }
-            if (modeEl.value === "live") {
-                return;
-            }
-            resumeStore[url] = { time: video.currentTime, updatedAt: Date.now() };
-            saveResumeStore();
-        });
-        video.addEventListener("ended", () => {
-            const url = streamUrlEl.textContent;
-            if (url && resumeStore[url]) {
-                delete resumeStore[url];
+            if (streamUrlEl.textContent) {
+                resumeStore[streamUrlEl.textContent] = { time: video.currentTime };
                 saveResumeStore();
             }
         });
-        video.addEventListener("error", () => {
-            if (modeEl.value === "live") {
-                startAutoRetryLive();
+        connectBtn.addEventListener("click", connectAndLoad);
+        clearCredsBtn.addEventListener("click", clearSavedCredentials);
+        clearAllBtn.addEventListener("click", clearAllCacheData);
+        playBtn.addEventListener("click", () => {
+            playPayload(buildSelectionPayload());
+        });
+        downloadBtn.addEventListener("click", () => {
+            downloadPayload(buildSelectionPayload());
+        });
+        addFavoriteBtn.addEventListener("click", addFavoriteFromSelection);
+        playFavoriteBtn.addEventListener("click", () => {
+            const index = Number(favoritesSelectEl.value);
+            if (Number.isInteger(index) && index >= 0 && index < favorites.length) {
+                playPayload(favorites[index]);
             }
         });
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "ArrowDown") {
-                e.preventDefault();
-                focusControlByIndex(remoteFocusIndex + 1);
-            } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                focusControlByIndex(remoteFocusIndex - 1);
-            } else if (e.key === "Enter") {
-                const active = document.activeElement;
-                if (active && typeof active.click === "function") {
-                    active.click();
-                }
+        removeFavoriteBtn.addEventListener("click", removeSelectedFavorite);
+        exportDataBtn.addEventListener("click", exportBackup);
+        importDataFileEl.addEventListener("change", (e) => {
+            if (e.target.files.length) {
+                importBackupFile(e.target.files[0]);
+            }
+        });
+        playRecentBtn.addEventListener("click", () => {
+            const index = Number(recentSelectEl.value);
+            if (Number.isInteger(index) && index >= 0 && index < recent.length) {
+                playPayload(recent[index]);
+            }
+        });
+        clearRecentBtn.addEventListener("click", clearRecent);
+
+        // On item selection, check for live mode and load EPG
+        itemEl.addEventListener("change", () => {
+            if (modeEl.value === "live") {
+                const streamId = itemEl.value;
+                loadLiveEpg(streamId).catch((e) => setStatus(`EPG error: ${e.message}`));
             }
         });
 
-        setControlsEnabled(false);
+        // Initialize
         loadSettings();
-        loadSavedCredentials();
         loadCollections();
         loadResumeStore();
-        populateHlsSelectors();
-        (async () => {
-            if (!settings.autoLogin || !usernameEl.value || !passwordEl.value) {
-                return;
-            }
-            connectAndLoad().catch((e) => setStatus(`Auto-login error: ${e.message}`));
-        })();
+        loadSavedCredentials();
+
+        if (settings.autoLogin && session.username) {
+            connectAndLoad();
+        }
     </script>
 </body>
 </html>
